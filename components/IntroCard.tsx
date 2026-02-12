@@ -21,7 +21,7 @@ const IntroCard: React.FC<IntroCardProps> = ({
     return (
       <div className="flex flex-col items-center justify-center p-8 max-w-md mx-auto text-center animate-fade-in z-10">
         <h1 className="font-serif text-3xl text-gray-800 mb-6 leading-relaxed">
-          Hello Tati.
+          Hello Tatii.
         </h1>
         <p className="font-sans font-light text-gray-500 mb-10 text-lg leading-relaxed">
           {INTRO_TEXT}

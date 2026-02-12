@@ -1,7 +1,7 @@
 import { ColorOption } from './types';
 
 export const INTRO_TEXT = "Colors are the music of the eyes. I wanted to create a melody just for you, but I need you to pick the notes.";
-export const TITLE_TEXT = "This is for your smile, Tati";
+export const TITLE_TEXT = "This is for your pretty smile, Tatii";
 export const SIGNATURE_TEXT = "Nika";
 export const FINAL_MESSAGE = "Because of my love for video games and football, I couldn't leave you without a little surprise. Haha.";
 
