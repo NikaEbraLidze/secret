@@ -35,7 +35,7 @@ const Flower: React.FC<FlowerProps> = ({ x, y, size, color, delay, petalCount, r
         rx={size * 0.15}
         ry={petalLength / 2}
         fill={color}
-        fillOpacity="0.8"
+        fillOpacity="0.9"
         transform={`rotate(${angle})`}
       />
     );
@@ -46,24 +46,17 @@ const Flower: React.FC<FlowerProps> = ({ x, y, size, color, delay, petalCount, r
       transform={`translate(${x}, ${y}) rotate(${rotationOffset}) scale(${scale})`}
       style={{
         transition: 'transform 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
-        transformOrigin: 'center',
+        // No transform origin needed here as x/y are handled by parent mostly
       }}
     >
-      {/* Stem (subtle) */}
-      <path
-        d={`M 0 0 Q ${size * 0.1} ${size} 0 ${size * 2}`}
-        stroke="#8FBC8F"
-        strokeWidth="2"
-        fill="none"
-        opacity="0.5"
-      />
+      {/* Internal stem removed. Stems are now drawn by the parent for the swaying effect */}
       
       {/* Petals Group */}
       <g>{petals}</g>
 
       {/* Center */}
       <circle cx="0" cy="0" r={centerSize} fill="#FFF" fillOpacity="0.9" />
-      <circle cx="0" cy="0" r={centerSize * 0.6} fill="#FFD700" fillOpacity="0.6" />
+      <circle cx="0" cy="0" r={centerSize * 0.6} fill="#FFD700" fillOpacity="0.8" />
     </g>
   );
 };

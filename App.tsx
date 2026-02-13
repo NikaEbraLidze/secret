@@ -3,20 +3,20 @@ import { AppStage, FlowerData } from './types';
 import { MAX_SELECTION, TITLE_TEXT, SIGNATURE_TEXT, FINAL_MESSAGE } from './constants';
 import IntroCard from './components/IntroCard';
 import Flower from './components/Flower';
-import { Heart, RotateCcw, Plus, Minus } from 'lucide-react';
+import { Heart, RotateCcw, Plus, Minus, X } from 'lucide-react';
 
 const App: React.FC = () => {
   const [stage, setStage] = useState<AppStage>('intro');
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [flowers, setFlowers] = useState<FlowerData[]>([]);
-  const [initialCount, setInitialCount] = useState<number>(0); // Track initial count
+  const [initialCount, setInitialCount] = useState<number>(0);
+  const [isLetterOpen, setIsLetterOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Background particles
   const [particles, setParticles] = useState<{x:number, y:number, size:number}[]>([]);
 
   useEffect(() => {
-    // Generate static background particles once
     const p = [];
     for(let i=0; i<20; i++) {
         p.push({
@@ -42,54 +42,71 @@ const App: React.FC = () => {
     }
   };
 
+  // Generate a position that looks like it's growing from a central bush
+  const getPlantPosition = (width: number, height: number, index: number, total: number) => {
+    const cx = width / 2;
+    const bottomY = height * 0.9; // Start near bottom
+    
+    // Spread calculation: Fanning out from -60 degrees to +60 degrees
+    const angleSpread = Math.PI / 1.5; // 120 degrees total spread
+    const baseAngle = -Math.PI / 2; // Pointing up
+    
+    // Random angle
+    const randomAngle = baseAngle + (Math.random() - 0.5) * angleSpread;
+    
+    // Height of the stem varies
+    const stemLength = height * 0.3 + Math.random() * (height * 0.3);
+
+    const x = cx + Math.cos(randomAngle) * stemLength;
+    const y = bottomY + Math.sin(randomAngle) * stemLength;
+
+    return { x, y, startX: cx, startY: bottomY };
+  };
+
   const generateFlowers = (colors: string[]) => {
     if (!containerRef.current) return;
     const { width, height } = containerRef.current.getBoundingClientRect();
     
     const newFlowers: FlowerData[] = [];
-    const count = 45; // Number of flowers
+    const count = 15; // A nice full bush
 
     for (let i = 0; i < count; i++) {
       const color = colors[i % colors.length];
-      // Random position with bias towards bottom/center
-      const x = Math.random() * width;
-      // Start flowers from bottom 50% mostly
-      const y = height * 0.4 + (Math.random() * height * 0.6);
+      const pos = getPlantPosition(width, height, i, count);
       
-      // Random size
-      const size = 30 + Math.random() * 50;
+      const size = 30 + Math.random() * 30;
 
       newFlowers.push({
         id: i,
-        x,
-        y,
+        x: pos.x,
+        y: pos.y,
         size,
         color,
-        delay: i * 150 + Math.random() * 500, // Staggered animation
-        petalCount: 5 + Math.floor(Math.random() * 4), // 5 to 8 petals
+        delay: i * 100 + Math.random() * 300,
+        petalCount: 5 + Math.floor(Math.random() * 4),
         rotationOffset: Math.random() * 360
       });
     }
     setFlowers(newFlowers);
-    setInitialCount(count); // Store the baseline
+    setInitialCount(count);
   };
 
-  const handleAddFlower = () => {
+  const handleAddFlower = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!containerRef.current || selectedColors.length === 0) return;
     const { width, height } = containerRef.current.getBoundingClientRect();
 
     const color = selectedColors[Math.floor(Math.random() * selectedColors.length)];
-    const x = Math.random() * width;
-    const y = height * 0.4 + (Math.random() * height * 0.6);
-    const size = 30 + Math.random() * 50;
+    const pos = getPlantPosition(width, height, 0, 1);
+    const size = 30 + Math.random() * 30;
     
     const newFlower: FlowerData = {
-        id: Date.now() + Math.random(), // Unique ID
-        x,
-        y,
+        id: Date.now() + Math.random(),
+        x: pos.x,
+        y: pos.y,
         size,
         color,
-        delay: 0, // Instant appear
+        delay: 0,
         petalCount: 5 + Math.floor(Math.random() * 4),
         rotationOffset: Math.random() * 360
     };
@@ -97,8 +114,8 @@ const App: React.FC = () => {
     setFlowers(prev => [...prev, newFlower]);
   };
 
-  const handleRemoveFlower = () => {
-      // Prevent removing if we are at or below the initial count
+  const handleRemoveFlower = (e: React.MouseEvent) => {
+      e.stopPropagation();
       if (flowers.length > initialCount) {
           setFlowers(prev => prev.slice(0, -1));
       }
@@ -106,25 +123,66 @@ const App: React.FC = () => {
 
   const handleFinishSelection = () => {
     setStage('blooming');
-    // Trigger flower generation slightly after state change for clean render
     setTimeout(() => {
         generateFlowers(selectedColors);
     }, 100);
   };
 
-  const handleReset = () => {
+  const handleReset = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setStage('selection');
     setFlowers([]);
     setSelectedColors([]);
     setInitialCount(0);
+    setIsLetterOpen(false);
   };
+
+  const handleGlobalClick = () => {
+      if (stage === 'blooming' && !isLetterOpen) {
+          setIsLetterOpen(true);
+      }
+  };
+
+  // Helper function to calculate point and rotation on bezier curve
+  const getBezierData = (t: number, sx:number, sy:number, cx:number, cy:number, ex:number, ey:number) => {
+      const inv = 1 - t;
+      const x = inv * inv * sx + 2 * inv * t * cx + t * t * ex;
+      const y = inv * inv * sy + 2 * inv * t * cy + t * t * ey;
+      
+      // Derivative for angle (tangent)
+      const dx = 2 * inv * (cx - sx) + 2 * t * (ex - cx);
+      const dy = 2 * inv * (cy - sy) + 2 * t * (ey - cy);
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      
+      return { x, y, angle };
+  };
+
+  // Screen center for stem origin calculation
+  const screenW = typeof window !== 'undefined' ? window.innerWidth : 1000;
+  const screenH = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const originX = screenW / 2;
+  const originY = screenH * 0.95; 
 
   return (
     <div 
       ref={containerRef}
-      className="relative min-h-screen w-full flex flex-col items-center overflow-hidden bg-white"
+      onClick={handleGlobalClick}
+      className={`relative min-h-screen w-full flex flex-col items-center overflow-hidden bg-white ${stage === 'blooming' && !isLetterOpen ? 'cursor-pointer' : ''}`}
     >
-        {/* Subtle Background Particles */}
+        {/* CSS for Sway Animation */}
+        <style>{`
+            @keyframes sway {
+                0% { transform: rotate(-2deg); }
+                50% { transform: rotate(2deg); }
+                100% { transform: rotate(-2deg); }
+            }
+            .sway-animation {
+                animation: sway 6s ease-in-out infinite;
+                transform-origin: center 95%;
+            }
+        `}</style>
+
+        {/* Background Particles */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
             {particles.map((p, i) => (
                 <div 
@@ -142,11 +200,11 @@ const App: React.FC = () => {
         </div>
 
       {/* Main Content Area */}
-      <div className="z-20 w-full flex-grow flex flex-col items-center justify-center relative">
+      <div className="z-20 w-full flex-grow flex flex-col items-center justify-center relative pointer-events-none">
         
         {/* Intro & Selection UI */}
         {(stage === 'intro' || stage === 'selection') && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm transition-opacity duration-1000">
+            <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm transition-opacity duration-1000 pointer-events-auto cursor-default">
                 <IntroCard 
                     stage={stage}
                     onStart={handleStart}
@@ -157,39 +215,21 @@ const App: React.FC = () => {
             </div>
         )}
 
-        {/* Blooming Stage Header */}
+        {/* Controls */}
         {stage === 'blooming' && (
           <>
-            {/* Top Controls */}
             <button 
               onClick={handleReset}
-              className="absolute top-4 right-4 md:top-6 md:right-6 p-2 text-gray-300 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100 z-50 cursor-pointer"
-              aria-label="Restart"
+              className="absolute top-4 right-4 md:top-6 md:right-6 p-2 text-gray-300 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100 z-50 cursor-pointer pointer-events-auto"
               title="Restart"
             >
                <RotateCcw size={20} />
             </button>
 
-            {/* Title & Message */}
-            <div className="absolute top-12 md:top-20 text-center w-full px-4 animate-fade-in z-30 pointer-events-none">
-              <h1 className="font-serif text-3xl md:text-5xl text-gray-800 mb-4 tracking-tight drop-shadow-sm">
-                <span className="italic">{TITLE_TEXT.split('Tatii')[0]}</span> 
-                <span className="text-pink-400 font-semibold ml-2">Tatii</span> 
-                <span className="text-red-400 ml-2 text-2xl align-middle inline-block animate-pulse">
-                  <Heart size={28} fill="currentColor" />
-                </span>
-              </h1>
-              <p className="font-sans text-xs md:text-sm text-gray-400 mt-2 tracking-widest uppercase opacity-80 max-w-md mx-auto leading-relaxed">
-                  {FINAL_MESSAGE}
-              </p>
-            </div>
-
-            {/* Flower Controls (Bottom Right) */}
-            <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 animate-fade-in">
+            <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 animate-fade-in pointer-events-auto">
                 <button
                     onClick={handleAddFlower}
                     className="p-3 bg-white/80 backdrop-blur-sm text-gray-600 rounded-full shadow-md hover:shadow-lg hover:bg-white transition-all transform hover:scale-105 active:scale-95"
-                    title="Add Flower"
                 >
                     <Plus size={20} />
                 </button>
@@ -201,37 +241,122 @@ const App: React.FC = () => {
                         ? 'opacity-50 cursor-not-allowed' 
                         : 'hover:shadow-lg hover:bg-white hover:scale-105 active:scale-95'
                     }`}
-                    title="Remove Flower"
                 >
                     <Minus size={20} />
                 </button>
             </div>
+            
+            {/* Hint Text */}
+            {!isLetterOpen && (
+                <div className="absolute top-20 md:top-32 left-0 right-0 text-center pointer-events-none animate-pulse opacity-40 z-40">
+                    <p className="font-serif text-gray-400 italic text-sm tracking-widest">Tap anywhere to read...</p>
+                </div>
+            )}
           </>
         )}
       </div>
 
-      {/* Flower Layer */}
+      {/* Plant Layer - Single Swaying Group */}
       {stage === 'blooming' && (
-        <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
-            {flowers.map((f) => (
-                <Flower key={f.id} {...f} />
-            ))}
-        </svg>
+          <svg className="absolute inset-0 w-full h-full z-10 overflow-visible pointer-events-none">
+              <g className="sway-animation">
+                  {flowers.map((f, i) => {
+                      const startX = originX;
+                      const startY = originY;
+                      const endX = f.x;
+                      const endY = f.y;
+                      const controlX = startX + (endX - startX) * 0.2;
+                      const controlY = startY - (startY - endY) * 0.5;
+                      
+                      // Calculate leaf positions deterministically based on ID/Index
+                      const hasLeaf1 = (f.id % 2) === 0;
+                      const hasLeaf2 = (f.id % 3) !== 0;
+                      
+                      const t1 = 0.35 + ((f.id * 13) % 15) / 100; // Random t between 0.35 and 0.5
+                      const t2 = 0.65 + ((f.id * 7) % 15) / 100; // Random t between 0.65 and 0.8
+                      
+                      const leaf1Data = getBezierData(t1, startX, startY, controlX, controlY, endX, endY);
+                      const leaf2Data = getBezierData(t2, startX, startY, controlX, controlY, endX, endY);
+
+                      return (
+                          <React.Fragment key={f.id}>
+                              {/* Stem */}
+                              <path 
+                                  d={`M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`}
+                                  stroke="#6B8E23" // Olive green
+                                  strokeWidth={f.size > 40 ? 3 : 2}
+                                  strokeLinecap="round"
+                                  fill="none"
+                                  opacity="0.9"
+                                  className="transition-all duration-1000"
+                              />
+
+                              {/* Leaf 1 */}
+                              {hasLeaf1 && (
+                                  <path 
+                                    d="M 0 0 Q 15 -10 30 0 Q 15 10 0 0" 
+                                    fill="#6B8E23" 
+                                    opacity="0.9"
+                                    transform={`translate(${leaf1Data.x}, ${leaf1Data.y}) rotate(${leaf1Data.angle - 45}) scale(${0.4 + (f.id % 4)/10})`}
+                                  />
+                              )}
+
+                              {/* Leaf 2 - Opposite Side */}
+                              {hasLeaf2 && (
+                                  <path 
+                                    d="M 0 0 Q 15 -10 30 0 Q 15 10 0 0" 
+                                    fill="#556B2F" // Slightly darker
+                                    opacity="0.9"
+                                    transform={`translate(${leaf2Data.x}, ${leaf2Data.y}) rotate(${leaf2Data.angle + 135}) scale(${0.3 + (f.id % 5)/10})`}
+                                  />
+                              )}
+
+                              <Flower {...f} />
+                          </React.Fragment>
+                      );
+                  })}
+              </g>
+          </svg>
       )}
 
-      {/* Footer / Signature */}
-      {stage === 'blooming' && (
-        <div className="absolute bottom-8 z-30 animate-fade-in text-center pb-4 pointer-events-none" style={{ animationDelay: '2s' }}>
-            <div className="flex flex-col items-center gap-1">
-                <span className="font-sans text-[10px] text-gray-400 tracking-[0.3em] uppercase">From</span>
-                <span className="font-serif italic text-2xl text-gray-700 relative">
-                    {SIGNATURE_TEXT}
-                    <span className="absolute -right-6 top-1 text-red-300 text-sm">
-                         <Heart size={14} fill="currentColor" />
-                    </span>
-                </span>
-            </div>
-        </div>
+      {/* Letter Modal */}
+      {isLetterOpen && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => setIsLetterOpen(false)}>
+              <div 
+                className="bg-white p-8 md:p-12 max-w-lg w-full shadow-2xl rounded-sm relative transform transition-all animate-float cursor-default"
+                onClick={(e) => e.stopPropagation()} 
+              >
+                  <button 
+                    onClick={() => setIsLetterOpen(false)}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition-colors"
+                  >
+                      <X size={24} />
+                  </button>
+
+                  <div className="text-center">
+                      <h1 className="font-serif text-3xl md:text-4xl text-gray-800 mb-6 tracking-tight leading-snug">
+                        <span className="italic">{TITLE_TEXT.split('Tatii')[0]}</span> 
+                        <span className="text-pink-400 font-semibold ml-2">Tatii</span> 
+                      </h1>
+                      
+                      <div className="w-16 h-[1px] bg-gray-200 mx-auto mb-6"></div>
+
+                      <p className="font-sans text-gray-600 text-lg leading-relaxed mb-10">
+                          {FINAL_MESSAGE}
+                      </p>
+
+                      <div className="flex flex-col items-center gap-2 mt-8">
+                        <span className="font-sans text-xs text-gray-400 tracking-[0.3em] uppercase">From</span>
+                        <span className="font-serif italic text-2xl text-gray-800 relative">
+                            {SIGNATURE_TEXT}
+                            <span className="absolute -right-6 top-1 text-red-400 text-sm animate-pulse">
+                                <Heart size={16} fill="currentColor" />
+                            </span>
+                        </span>
+                      </div>
+                  </div>
+              </div>
+          </div>
       )}
     </div>
   );
